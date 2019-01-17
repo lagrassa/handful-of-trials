@@ -7,7 +7,8 @@ import argparse
 import pprint
 
 from dotmap import DotMap
-
+import sys
+sys.path.append(os.getcwd()+"/..")
 from dmbrl.misc.MBExp import MBExperiment
 from dmbrl.controllers.MPC import MPC
 from dmbrl.config import create_config
@@ -28,6 +29,24 @@ def main(env, ctrl_type, ctrl_args, overrides, logdir):
 
     exp.run_experiment()
 
+def learn_setup(env=None, ctrl_type=None, ctrl_args=None, overrides=None, logdir=None, reward_scale=None):
+    from dotmap import DotMap
+    import pprint
+    from dmbrl.controllers.MPC import MPC
+    ctrl_args = DotMap(**{key: val for (key, val) in ctrl_args})
+    cfg = create_config(env, ctrl_type, ctrl_args, overrides, logdir)
+    cfg.pprint()
+    cfg.exp_cfg.exp_cfg.policy = MPC(cfg.ctrl_cfg)
+    exp = MBExperiment(cfg.exp_cfg) 
+    os.makedirs(exp.logdir)
+    with open(os.path.join(exp.logdir, "config.txt"), "w") as f:
+        f.write(pprint.pformat(cfg.toDict()))
+    local_variables = exp.run_experiment(setup_only=True)
+    return local_variables
+
+def learn_iter(**local_variables):
+    exp = local_variables['exp_obj'] 
+    exp._learn_iter(**local_variables) 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

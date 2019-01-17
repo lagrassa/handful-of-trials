@@ -70,7 +70,7 @@ class MBExperiment:
         self.nrecord = params.log_cfg.get("nrecord", 0)
         self.neval = params.log_cfg.get("neval", 1)
 
-    def run_experiment(self):
+    def run_experiment(self, setup_only=False):
         """Perform experiment.
         """
         os.makedirs(self.logdir, exist_ok=True)
@@ -97,54 +97,62 @@ class MBExperiment:
             )
 
         # Training loop
+        local_variables = {'traj_obs':traj_obs, 'traj_acs':traj_acs, 'traj_rets':traj_rets, 'traj_rews':traj_rews}   
+        if setup_only:
+            local_variables['exp_obj'] = self
+            return local_variables
         for i in range(self.ntrain_iters):
             print("####################################################################")
             print("Starting training iteration %d." % (i + 1))
+            local_variables['i']=i
+            self.learn_iter(**local_variables)
+    def _learn_iter(self, traj_obs=None, traj_acs =None, traj_rets = None, traj_rews = None, i = None, exp_obj = None, update=None):
+        if i is None:
+            i = update
+        iter_dir = os.path.join(self.logdir, "train_iter%d" % (i + 1))
+        os.makedirs(iter_dir, exist_ok=True)
 
-            iter_dir = os.path.join(self.logdir, "train_iter%d" % (i + 1))
-            os.makedirs(iter_dir, exist_ok=True)
-
-            samples = []
-            for j in range(self.nrecord):
-                samples.append(
-                    self.agent.sample(
-                        self.task_hor, self.policy,
-                        os.path.join(iter_dir, "rollout%d.mp4" % j)
-                    )
+        samples = []
+        for j in range(self.nrecord):
+            samples.append(
+                self.agent.sample(
+                    self.task_hor, self.policy,
+                    os.path.join(iter_dir, "rollout%d.mp4" % j)
                 )
-            if self.nrecord > 0:
-                for item in filter(lambda f: f.endswith(".json"), os.listdir(iter_dir)):
-                    os.remove(os.path.join(iter_dir, item))
-            for j in range(max(self.neval, self.nrollouts_per_iter) - self.nrecord):
-                samples.append(
-                    self.agent.sample(
-                        self.task_hor, self.policy
-                    )
-                )
-            print("Rewards obtained:", [sample["reward_sum"] for sample in samples[:self.neval]])
-            traj_obs.extend([sample["obs"] for sample in samples[:self.nrollouts_per_iter]])
-            traj_acs.extend([sample["ac"] for sample in samples[:self.nrollouts_per_iter]])
-            traj_rets.extend([sample["reward_sum"] for sample in samples[:self.neval]])
-            traj_rews.extend([sample["rewards"] for sample in samples[:self.nrollouts_per_iter]])
-            samples = samples[:self.nrollouts_per_iter]
-
-            self.policy.dump_logs(self.logdir, iter_dir)
-            savemat(
-                os.path.join(self.logdir, "logs.mat"),
-                {
-                    "observations": traj_obs,
-                    "actions": traj_acs,
-                    "returns": traj_rets,
-                    "rewards": traj_rews
-                }
             )
-            # Delete iteration directory if not used
-            if len(os.listdir(iter_dir)) == 0:
-                os.rmdir(iter_dir)
-
-            if i < self.ntrain_iters - 1:
-                self.policy.train(
-                    [sample["obs"] for sample in samples],
-                    [sample["ac"] for sample in samples],
-                    [sample["rewards"] for sample in samples]
+        if self.nrecord > 0:
+            for item in filter(lambda f: f.endswith(".json"), os.listdir(iter_dir)):
+                os.remove(os.path.join(iter_dir, item))
+        for j in range(max(self.neval, self.nrollouts_per_iter) - self.nrecord):
+            samples.append(
+                self.agent.sample(
+                    self.task_hor, self.policy
                 )
+            )
+        print("Rewards obtained:", [sample["reward_sum"] for sample in samples[:self.neval]])
+        traj_obs.extend([sample["obs"] for sample in samples[:self.nrollouts_per_iter]])
+        traj_acs.extend([sample["ac"] for sample in samples[:self.nrollouts_per_iter]])
+        traj_rets.extend([sample["reward_sum"] for sample in samples[:self.neval]])
+        traj_rews.extend([sample["rewards"] for sample in samples[:self.nrollouts_per_iter]])
+        samples = samples[:self.nrollouts_per_iter]
+
+        self.policy.dump_logs(self.logdir, iter_dir)
+        savemat(
+            os.path.join(self.logdir, "logs.mat"),
+            {
+                "observations": traj_obs,
+                "actions": traj_acs,
+                "returns": traj_rets,
+                "rewards": traj_rews
+            }
+        )
+        # Delete iteration directory if not used
+        if len(os.listdir(iter_dir)) == 0:
+            os.rmdir(iter_dir)
+
+        if i < self.ntrain_iters - 1:
+            self.policy.train(
+                [sample["obs"] for sample in samples],
+                [sample["ac"] for sample in samples],
+                [sample["rewards"] for sample in samples]
+            )
