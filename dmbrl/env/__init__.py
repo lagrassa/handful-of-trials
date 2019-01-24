@@ -18,6 +18,13 @@ register(
     entry_point='dmbrl.env.pusher:PusherEnv'
 )
 
+register(
+    id='NongoalFetchPush-v0',
+    entry_point='dmbrl.env.fetch_push:NongoalFetchPushEnv'
+
+)
+
+
 
 register(
     id='MBRLHalfCheetah-v0',

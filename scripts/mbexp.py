@@ -18,7 +18,6 @@ def main(env, ctrl_type, ctrl_args, overrides, logdir):
     ctrl_args = DotMap(**{key: val for (key, val) in ctrl_args})
     cfg = create_config(env, ctrl_type, ctrl_args, overrides, logdir)
     cfg.pprint()
-
     if ctrl_type == "MPC":
         cfg.exp_cfg.exp_cfg.policy = MPC(cfg.ctrl_cfg)
     exp = MBExperiment(cfg.exp_cfg)
@@ -46,7 +45,7 @@ def learn_setup(env=None, ctrl_type=None, ctrl_args=None, overrides=None, logdir
 
 def learn_iter(**local_variables):
     exp = local_variables['exp_obj'] 
-    exp._learn_iter(**local_variables) 
+    return exp._learn_iter(**local_variables) 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

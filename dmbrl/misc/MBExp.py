@@ -44,6 +44,7 @@ class MBExperiment:
         """
         self.env = get_required_argument(params.sim_cfg, "env", "Must provide environment.")
         self.task_hor = get_required_argument(params.sim_cfg, "task_hor", "Must provide task horizon.")
+        self.success_rates = []
         if params.sim_cfg.get("stochastic", False):
             self.agent = Agent(DotMap(
                 env=self.env, noisy_actions=True,
@@ -105,7 +106,7 @@ class MBExperiment:
             print("####################################################################")
             print("Starting training iteration %d." % (i + 1))
             local_variables['i']=i
-            self.learn_iter(**local_variables)
+            self._learn_iter(**local_variables)
     def _learn_iter(self, traj_obs=None, traj_acs =None, traj_rets = None, traj_rews = None, i = None, exp_obj = None, update=None):
         if i is None:
             i = update
@@ -134,6 +135,7 @@ class MBExperiment:
         traj_acs.extend([sample["ac"] for sample in samples[:self.nrollouts_per_iter]])
         traj_rets.extend([sample["reward_sum"] for sample in samples[:self.neval]])
         traj_rews.extend([sample["rewards"] for sample in samples[:self.nrollouts_per_iter]])
+
         samples = samples[:self.nrollouts_per_iter]
 
         self.policy.dump_logs(self.logdir, iter_dir)
@@ -156,3 +158,8 @@ class MBExperiment:
                 [sample["ac"] for sample in samples],
                 [sample["rewards"] for sample in samples]
             )
+        success_rate = 1+np.mean([max(np.round(sample["rewards"][0]),-1) for sample in samples])
+        self.success_rates.append(success_rate)
+        np.save("succes_rates_new.npy", self.success_rates)
+        print("Success rate", success_rate)
+        return None, success_rate
